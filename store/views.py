@@ -1,5 +1,8 @@
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
+from django.urls import reverse
+from django.views.generic import FormView
+from paypal.standard.forms import PayPalPaymentsForm
 
 from store.forms import RegisterForm
 from store.models import Category, Product, Cart, Items
@@ -56,12 +59,15 @@ def cart(request):
 
     # Find items of the cart
     items = Items.objects.filter(cart=cart)
+    gypsum = 0
     for item in items:
+        gypsum = gypsum+item.product.price
         txt += item.product.slug + ": " + str(item.quantity) + "<br>"
 
     context = {
         'items': items,
         'categories': Category.objects.all().order_by('name'),
+        'totalprice': gypsum
     }
 
     return render(request, 'store/cart.html', context)
@@ -114,3 +120,24 @@ def delete_from_cart(request, product_id):
 
 def paypal(request):
     print("Openning connection to paypal")
+
+def checkout(request):
+    return render(request, 'store/checkout.html')
+
+class PaypalFormView(FormView):
+    template_name = 'paypal_form.html'
+    form_class = PayPalPaymentsForm
+
+    def get_initial(self):
+        return {
+            "business": 'your-paypal-business-address@example.com',
+            "amount": 20,
+            "currency_code": "EUR",
+            "item_name": 'Example item',
+            "invoice": 1234,
+            "notify_url": self.request.build_absolute_uri(reverse('paypal-ipn')),
+            "return_url": self.request.build_absolute_uri(reverse('paypal-return')),
+            "cancel_return": self.request.build_absolute_uri(reverse('paypal-cancel')),
+            "lc": 'EN',
+            "no_shipping": '1',
+        }
